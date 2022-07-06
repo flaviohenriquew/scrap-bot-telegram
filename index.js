@@ -109,20 +109,30 @@ function doRequest(url) {
 
 // BOT casa e cozinha
 bot.hears(/casa (.+)/gi, async ctx => {
-	console.log("teste");
-	const match = ctx.match[1].split(',');
-	const url = match[0]
+	let match = ctx.match[1].split(',');
+	match = match[0];
+	//const url = match[0];
+
+	//const match = ctx.match.input
+	const start = match.substring(match.indexOf('.br/') + 4)
+	const end = start.indexOf('/')
+	const newString = start.substring(0, end)
+	const url = match.replace(newString, 'magazinecasadapromocoes')
+	console.log(url);
 	//const linkAffiliate = match[1]
 
-	let amazon = url.match(/amazon.com.br+/g);
-	if(amazon) {
-		console.log('opening browser');
-		const browser = await puppeteer.launch({headless: false});//{ args: ['--no-sandbox', '--disable-setuid-sandbox',] });
-		const page = await browser.newPage();
-		console.log("Iniciado");
-		await page.goto(url); //entrando na página
-		console.log("Entrou na URL");
+	console.log('opening browser');
+	const browser = await puppeteer.launch({headless: false});//{ args: ['--no-sandbox', '--disable-setuid-sandbox',] });
+	const page = await browser.newPage();
+	console.log("Iniciado");
+	await page.goto(url); //entrando na página
+	console.log("Entrou na URL");
 
+	let amazon = url.match(/amazon.com.br+/g);
+	let lojasrenner = url.match(/lojasrenner.com.br+/g);
+	let magazinevoce = url.match(/magazinevoce.com.br+/g);
+
+	if(amazon) {
 		await page.waitForSelector('.itemNo0'); //aguardando a pagina carregar o id para ir pra prox linha
 		const imagem = await page.$eval('.itemNo0 > span > span > div > img',element => element.getAttribute("src")); //pega a imagem
 
@@ -132,19 +142,27 @@ bot.hears(/casa (.+)/gi, async ctx => {
 		await page.waitForSelector('#featurebullets_feature_div'); //aguardando a pagina carregar o id para ir pra prox linha
 		const sobre = await page.$eval('#featurebullets_feature_div > div',element => element.innerHTML); //pega o valor
 
-		let valor = await page.evaluate(()=>{ const el = document.querySelector('#snsDetailPagePrice'); if(!el){ return null }else{return el.innerText;}  })
+		let valor = await page.evaluate(()=>{const el = document.querySelector('#snsDetailPagePrice');
+			if(!el){ return null }else{return el.innerText;}
+		})
 		if(!valor) {
-			valor = await page.evaluate(()=>{ const el = document.querySelector('#corePrice_desktop > div >table > tbody > tr > td.a-span12 > span > span > span'); if(!el) {return null}else{return el.innerText;}  })
+			valor = await page.evaluate(()=>{ const el = document.querySelector('#corePrice_desktop > div >table > tbody > tr > td.a-span12 > span > span > span');
+				if(!el) {return null}else{return el.innerText;}
+			})
 		}
 		if(!valor) {
-			valor = await page.evaluate(()=>{ const el = document.querySelector('.priceToPay > .a-offscreen'); if(!el){ return null}else {return el.innerText;}  })
+			valor = await page.evaluate(()=>{ const el = document.querySelector('.priceToPay > .a-offscreen');
+				if(!el){ return null}else {return el.innerText;}
+			})
 		}
 
-		let parcelamento = await page.evaluate(()=>{  const el = document.querySelector('.best-offer-name'); if(!el) {return null}else{return el.innerText;}  })
+		let parcelamento = await page.evaluate(()=>{  const el = document.querySelector('.best-offer-name');
+			if(!el) {return null}else{return el.innerText;}
+		})
 		if(!parcelamento){	parcelamento = '';	}
 
-		let colorname = await page.evaluate(()=>{
-			const el = document.querySelector('#variation_color_name > div >label'); if(!el) {return null}else{return el.innerText;}
+		let colorname = await page.evaluate(()=>{   const el = document.querySelector('#variation_color_name > div >label');
+			if(!el) {return null}else{return el.innerText;}
 		})
 		if(colorname) {
 			await page.waitForSelector('#variation_color_name'); //aguarda até a classe carregar
@@ -159,8 +177,6 @@ bot.hears(/casa (.+)/gi, async ctx => {
 			if(colorname && varcolors){	colorname = '<b>'+colorname+'</b> '+varcolors	}
 		}
 		if(!colorname){	colorname = '';	}
-
-
 
 		if (valor) {
 			await bot.telegram.sendPhoto(process.env.CHAT_ID, imagem, {
@@ -177,28 +193,88 @@ ${colorname}
 				parse_mode: 'HTML'
 			})
 		}
+	}else if(lojasrenner) { // com problema
+		await page.waitForSelector('.open-gallery.slick-slide.slick-current'); //aguardando a pagina carregar o id para ir pra prox linha
+		let imagem = await page.$$eval('.open-gallery.slick-slide.slick-current > img',element => element.map(src =>src.src)); //pega a imagem
+		imagem = imagem[0];
+
+		await page.waitForSelector('.product_name'); //aguardando a pagina carregar o id para ir pra prox linha
+		const titulo = await page.$eval('.product_name > span',element => element.innerText); //pega o titulo
+
+		let colorname = '';/*await page.evaluate(()=>{   const el = document.querySelectorAll('.form_field > div > span')
+			if(!el) {return null}else{return el.innerText;}
+		})*/
+
+		await page.waitForSelector('.wrap_size'); //aguarda até a classe carregar
+		let varcolors = await page.evaluate(()=>{
+			const varcolor = document.querySelectorAll('.wrap_size > div.variants-carousel.slick-initialized.slick-slider > div.slick-list.draggable > div.slick-track > label.label.js-select-label.slick-slide.slick-active > div.content > span.nome');
+			if (varcolor) {
+				let strlistcn = '';
+				//for (var i = 0; i < varcolor.length; i++) {		if(i === varcolor.length - 1) {strlistcn += varcolor[i].alt;}else{strlistcn += varcolor[i].alt+', ';}	}
+				return varcolor;
+			}else{return  null;}
+		})
+
+		//await page.waitForSelector('.form_field'); //aguardando a pagina carregar o id para ir pra prox linha
+		//let colorname = await page.$eval('.form_field.js-only-one-level.color > div > span',element => element.innerText); //pega a imagem
+		console.log(varcolors);
+		let valor = '123';
+		let parcelamento = '';
+
+		if (valor) {
+			await bot.telegram.sendPhoto(process.env.CHAT_ID, imagem, {
+				caption: `
+			${titulo}
+			
+${colorname}
+
+			👉🏼 <b>Preço</b>: ${valor} ${parcelamento}
+		`,
+				reply_markup: {
+					inline_keyboard: [[{ text: "✅ Comprar agora", url: url }]]
+				},
+				parse_mode: 'HTML'
+			})
+		}
+	}else if(magazinevoce) {
+		await page.waitForSelector('.pgallery'); //aguardando a pagina carregar o id para ir pra prox linha
+		const imagem = await page.$eval('.pgallery > div.photo.hide-mobile > img',element => element.getAttribute("src")); //pega a imagem
+
+		await page.waitForSelector('div.product > h3.hide-mobile'); //aguardando a pagina carregar o id para ir pra prox linha
+		let titulo = await page.$eval('div.product > h3.hide-mobile',element => element.innerText); //pega o titulo
+		titulo = titulo.split('\n')[0];
+
+		await page.waitForSelector('.p-price'); //aguardando a pagina carregar o id para ir pra prox linha
+		let valor = await page.$eval('div[class="p-price"]', valor => valor.innerText);
+		valor = valor.split('\n')[1];
+
+		await page.waitForSelector('.p-through'); //aguardando a pagina carregar o id para ir pra prox linha
+		let valororiginal = await page.$eval('small[class="p-through"]', valor => valor.innerText);
+		console.log("valororiginal",valororiginal);
 
 
-		await page.waitForTimeout(3000);
+		if (valor) {
+			await bot.telegram.sendPhoto(process.env.CHAT_ID, imagem, {
+				caption: `
+			${titulo}
 
-		await browser.close();
-		console.log('closing browser');
-
+			👉🏼 <b>Preço</b>: ${valor} 🔥 <s>${valororiginal}</s>
+		`,
+				reply_markup: {
+					inline_keyboard: [[{ text: "✅ Comprar agora", url: url }]]
+				},
+				parse_mode: 'HTML'
+			})
+		}
 
 	}else{
 		console.log("ops");
 	}
 
+	await page.waitForTimeout(3000);
+	await browser.close();
+	console.log('closing browser');
 
-	/*} catch (error) {
-		console.log('scrape error', error.message);
-	}*//*finally {
-
-		if (browser) {
-			await browser.close();
-			console.log('closing browser');
-		}
-	}*/
 })
 
 bot.hears(/./gi, async (ctx) => {
