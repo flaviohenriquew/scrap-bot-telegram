@@ -1,24 +1,15 @@
 require('dotenv').config();
-const { Markup, Telegraf } = require('telegraf')
+const { Markup, Telegraf } = require('telegraf');
 const puppeteer = require("puppeteer");
-const bot = new Telegraf(process.env.BOT_TOKEN)
+const bot = new Telegraf(process.env.BOT_TOKEN);
 const request = require("request");
-const fetch = require('node-fetch')
-//bot.telegram.sendMessage(process.env.CHAT_ID, 'Hello Telegram!');
-//const scrape = require('aliexpress-product-scraper');
-//const product = scrape('1005003557398937');
-
-//product.then(res => {
-//  console.log('The JSON: ', res);
-//});
+const fetch = require('node-fetch');
 const prettylink = require('prettylink');
 const bitly = new prettylink.Bitly('7307fa60b749efb3072afa4dfe6c4fa132c0e12e');
-
-// getAffiliateLInk
-const crypto = require("crypto")
-const dayjs = require("dayjs")
-const utc = require("dayjs/plugin/utc")
-const timezone = require("dayjs/plugin/timezone")
+const crypto = require("crypto");
+const dayjs = require("dayjs");
+const utc = require("dayjs/plugin/utc");
+const timezone = require("dayjs/plugin/timezone");
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -46,7 +37,6 @@ const sortObject = (obj) => {
 		}, {});
 };
 
-
 const signRequest = (parameters) => {
 	const sortedParams = sortObject(parameters);
 	const sortedString = Object.keys(sortedParams).reduce((acc, objKey) => {
@@ -58,9 +48,7 @@ const signRequest = (parameters) => {
 	return signedString.toUpperCase();
 };
 
-
 const getProductById = async (productId) => {
-
 	const timestamp = dayjs().tz("America/Recife").format("YYYY-MM-DD HH:mm:ss");
 
 	const payload = {
@@ -90,42 +78,46 @@ const getProductById = async (productId) => {
 		body: new URLSearchParams(allParams),
 	});
 
-	return await res.json()
-}
+	const json = await res.json();
+
+	// Logging the API response for debugging
+	console.log('API Response:', JSON.stringify(json, null, 2));
+
+	// Check if the response contains the expected properties
+	if (json.aliexpress_affiliate_productdetail_get_response &&
+		json.aliexpress_affiliate_productdetail_get_response.resp_result &&
+		json.aliexpress_affiliate_productdetail_get_response.resp_result.result) {
+		return json;
+	} else {
+		throw new Error('Invalid API response structure');
+	}
+};
 
 function doRequest(url) {
 	return new Promise((resolve, reject) => {
 		request({ url: url, followRedirect: false }, async function (error, response, body) {
-			//console.log(response.statusCode);
 			if (response.statusCode >= 300 && response.statusCode < 400) {
-				resolve(await response.headers.location)
+				resolve(await response.headers.location);
 			}
-			reject(error)
-		})
-	})
+			reject(error);
+		});
+	});
 }
-
-
 
 // BOT casa e cozinha
 bot.hears(/casa (.+)/gi, async ctx => {
 	let match = ctx.match[1].split(',');
 	match = match[0];
-	//const url = match[0];
-
-	//const match = ctx.match.input
-	const start = match.substring(match.indexOf('.br/') + 4)
-	const end = start.indexOf('/')
-	const newString = start.substring(0, end)
-	const url = match.replace(newString, 'magazinecasadapromocoes')
+	const start = match.substring(match.indexOf('.br/') + 4);
+	const end = start.indexOf('/');
+	const newString = start.substring(0, end);
+	const url = match.replace(newString, 'magazinecasadapromocoes');
 	console.log(url);
-	//const linkAffiliate = match[1]
 
-	console.log('opening browser');
-	const browser = await puppeteer.launch({headless: false});//{ args: ['--no-sandbox', '--disable-setuid-sandbox',] });
+	const browser = await puppeteer.launch({headless: false});
 	const page = await browser.newPage();
 	console.log("Iniciado");
-	await page.goto(url); //entrando na página
+	await page.goto(url);
 	console.log("Entrou na URL");
 
 	let amazon = url.match(/amazon.com.br+/g);
@@ -133,48 +125,48 @@ bot.hears(/casa (.+)/gi, async ctx => {
 	let magazinevoce = url.match(/magazinevoce.com.br+/g);
 
 	if(amazon) {
-		await page.waitForSelector('.itemNo0'); //aguardando a pagina carregar o id para ir pra prox linha
-		const imagem = await page.$eval('.itemNo0 > span > span > div > img',element => element.getAttribute("src")); //pega a imagem
+		await page.waitForSelector('.itemNo0');
+		const imagem = await page.$eval('.itemNo0 > span > span > div > img',element => element.getAttribute("src"));
 
-		await page.waitForSelector('#productTitle'); //aguardando a pagina carregar o id para ir pra prox linha
-		const titulo = await page.$eval('#productTitle',element => element.innerText); //pega o titulo
+		await page.waitForSelector('#productTitle');
+		const titulo = await page.$eval('#productTitle',element => element.innerText);
 
-		await page.waitForSelector('#featurebullets_feature_div'); //aguardando a pagina carregar o id para ir pra prox linha
-		const sobre = await page.$eval('#featurebullets_feature_div > div',element => element.innerHTML); //pega o valor
+		await page.waitForSelector('#featurebullets_feature_div');
+		const sobre = await page.$eval('#featurebullets_feature_div > div',element => element.innerHTML);
 
 		let valor = await page.evaluate(()=>{const el = document.querySelector('#snsDetailPagePrice');
 			if(!el){ return null }else{return el.innerText;}
-		})
+		});
 		if(!valor) {
 			valor = await page.evaluate(()=>{ const el = document.querySelector('#corePrice_desktop > div >table > tbody > tr > td.a-span12 > span > span > span');
 				if(!el) {return null}else{return el.innerText;}
-			})
+			});
 		}
 		if(!valor) {
 			valor = await page.evaluate(()=>{ const el = document.querySelector('.priceToPay > .a-offscreen');
 				if(!el){ return null}else {return el.innerText;}
-			})
+			});
 		}
 
 		let parcelamento = await page.evaluate(()=>{  const el = document.querySelector('.best-offer-name');
 			if(!el) {return null}else{return el.innerText;}
-		})
+		});
 		if(!parcelamento){	parcelamento = '';	}
 
 		let colorname = await page.evaluate(()=>{   const el = document.querySelector('#variation_color_name > div >label');
 			if(!el) {return null}else{return el.innerText;}
-		})
+		});
 		if(colorname) {
-			await page.waitForSelector('#variation_color_name'); //aguarda até a classe carregar
+			await page.waitForSelector('#variation_color_name');
 			let varcolors = await page.evaluate(()=>{
 				const varcolor = document.querySelectorAll('#variation_color_name > ul > li > span >div > span > span > span > button > div > div >img');
 				if (varcolor) {
 					let strlistcn = '';
-					for (var i = 0; i < varcolor.length; i++) {		if(i === varcolor.length - 1) {strlistcn += varcolor[i].alt;}else{strlistcn += varcolor[i].alt+', ';}	}
+					for (var i = 0; i < varcolor.length; i++) { if(i === varcolor.length - 1) {strlistcn += varcolor[i].alt;}else{strlistcn += varcolor[i].alt+', ';} }
 					return strlistcn;
 				}
-			})
-			if(colorname && varcolors){	colorname = '<b>'+colorname+'</b> '+varcolors	}
+			});
+			if(colorname && varcolors){	colorname = '<b>'+colorname+'</b> '+varcolors; }
 		}
 		if(!colorname){	colorname = '';	}
 
@@ -191,33 +183,27 @@ ${colorname}
 					inline_keyboard: [[{ text: "✅ Comprar agora", url: url }]]
 				},
 				parse_mode: 'HTML'
-			})
+			});
 		}
-	}else if(lojasrenner) { // com problema
-		await page.waitForSelector('.open-gallery.slick-slide.slick-current'); //aguardando a pagina carregar o id para ir pra prox linha
-		let imagem = await page.$$eval('.open-gallery.slick-slide.slick-current > img',element => element.map(src =>src.src)); //pega a imagem
+	} else if(lojasrenner) {
+		await page.waitForSelector('.open-gallery.slick-slide.slick-current');
+		let imagem = await page.$$eval('.open-gallery.slick-slide.slick-current > img',element => element.map(src =>src.src));
 		imagem = imagem[0];
 
-		await page.waitForSelector('.product_name'); //aguardando a pagina carregar o id para ir pra prox linha
-		const titulo = await page.$eval('.product_name > span',element => element.innerText); //pega o titulo
+		await page.waitForSelector('.product_name');
+		const titulo = await page.$eval('.product_name > span',element => element.innerText);
 
-		let colorname = '';/*await page.evaluate(()=>{   const el = document.querySelectorAll('.form_field > div > span')
-			if(!el) {return null}else{return el.innerText;}
-		})*/
+		let colorname = '';
 
-		await page.waitForSelector('.wrap_size'); //aguarda até a classe carregar
+		await page.waitForSelector('.wrap_size');
 		let varcolors = await page.evaluate(()=>{
 			const varcolor = document.querySelectorAll('.wrap_size > div.variants-carousel.slick-initialized.slick-slider > div.slick-list.draggable > div.slick-track > label.label.js-select-label.slick-slide.slick-active > div.content > span.nome');
 			if (varcolor) {
 				let strlistcn = '';
-				//for (var i = 0; i < varcolor.length; i++) {		if(i === varcolor.length - 1) {strlistcn += varcolor[i].alt;}else{strlistcn += varcolor[i].alt+', ';}	}
 				return varcolor;
 			}else{return  null;}
-		})
+		});
 
-		//await page.waitForSelector('.form_field'); //aguardando a pagina carregar o id para ir pra prox linha
-		//let colorname = await page.$eval('.form_field.js-only-one-level.color > div > span',element => element.innerText); //pega a imagem
-		console.log(varcolors);
 		let valor = '123';
 		let parcelamento = '';
 
@@ -234,24 +220,23 @@ ${colorname}
 					inline_keyboard: [[{ text: "✅ Comprar agora", url: url }]]
 				},
 				parse_mode: 'HTML'
-			})
+			});
 		}
-	}else if(magazinevoce) {
-		await page.waitForSelector('.pgallery'); //aguardando a pagina carregar o id para ir pra prox linha
-		const imagem = await page.$eval('.pgallery > div.photo.hide-mobile > img',element => element.getAttribute("src")); //pega a imagem
+	} else if(magazinevoce) {
+		await page.waitForSelector('.pgallery');
+		const imagem = await page.$eval('.pgallery > div.photo.hide-mobile > img',element => element.getAttribute("src"));
 
-		await page.waitForSelector('div.product > h3.hide-mobile'); //aguardando a pagina carregar o id para ir pra prox linha
-		let titulo = await page.$eval('div.product > h3.hide-mobile',element => element.innerText); //pega o titulo
+		await page.waitForSelector('div.product > h3.hide-mobile');
+		let titulo = await page.$eval('div.product > h3.hide-mobile',element => element.innerText);
 		titulo = titulo.split('\n')[0];
 
-		await page.waitForSelector('.p-price'); //aguardando a pagina carregar o id para ir pra prox linha
+		await page.waitForSelector('.p-price');
 		let valor = await page.$eval('div[class="p-price"]', valor => valor.innerText);
 		valor = valor.split('\n')[1];
 
-		await page.waitForSelector('.p-through'); //aguardando a pagina carregar o id para ir pra prox linha
+		await page.waitForSelector('.p-through');
 		let valororiginal = await page.$eval('small[class="p-through"]', valor => valor.innerText);
 		console.log("valororiginal",valororiginal);
-
 
 		if (valor) {
 			await bot.telegram.sendPhoto(process.env.CHAT_ID, imagem, {
@@ -264,144 +249,110 @@ ${colorname}
 					inline_keyboard: [[{ text: "✅ Comprar agora", url: url }]]
 				},
 				parse_mode: 'HTML'
-			})
+			});
 		}
-
-	}else{
+	} else {
 		console.log("ops");
 	}
 
 	await page.waitForTimeout(3000);
 	await browser.close();
 	console.log('closing browser');
-
-})
+});
 
 bot.hears(/./gi, async (ctx) => {
 	let browser, page;
 	const match = ctx.message.text.split(/\n/g);
-	let url = match[0]
-	let cupom = match[1]
-		console.log(match[0])
-	//const linkAffiliate = match[1]
-	
-	let link = null
-	let dados = null
-	let isAffiliate = null
-	//console.log(ctx.message.text)
-	
-	if (/viajar\.hu/gi.test(url)) {
-		console.log(url)
-		const res = await doRequest(url)
-		const link2 = res.substring(res.indexOf('/aud/') + 5)
-		getDados(link2, ctx)
-		return
-	}
+	let url = match[0];
+	let cupom = match[1];
+	console.log(match[0]);
 
-	if (/\/item\/[0-9]/gi.test(url)) {
-		url = match[0]
-		link = url.substring(url.indexOf('item/') + 5, url.indexOf('.html')) || null
-		dados = await getProductById(String(link)) || null
-		isAffiliate = await dados.aliexpress_affiliate_productdetail_get_response.resp_result.result.current_record_count || false
-	}
+	let link = null;
+	let dados = null;
+	let isAffiliate = null;
 
-	if (/a\.aliexpress\.com/gi.test(match)) {
-		url = match[1]
-		link = url.substring(url.indexOf('https')) || null
-		const res = await doRequest(link)
-		link = res.substring(res.indexOf('item/') + 5, res.indexOf('.html'))
-		dados = await getProductById(String(link)) || null
-		isAffiliate = await dados.aliexpress_affiliate_productdetail_get_response.resp_result.result.current_record_count || false
-		console.log(isAffiliate)
-		cupom = 'Sem cupom para esta oferta'
-	}
+	try {
+		if (/\/item\/[0-9]/gi.test(url)) {
+			link = url.substring(url.indexOf('item/') + 5, url.indexOf('.html')) || null;
+			dados = await getProductById(String(link)) || null;
+			isAffiliate = dados.aliexpress_affiliate_productdetail_get_response.resp_result.result.current_record_count || false;
+		}
 
-	if (isAffiliate) {
-		const produto = await dados.aliexpress_affiliate_productdetail_get_response.resp_result.result.products
-		//console.log(produto)
+		if (/a\.aliexpress\.com/gi.test(url)) {
+			const res = await doRequest(url);
+			link = res.substring(res.indexOf('item/') + 5, res.indexOf('.html'));
+			dados = await getProductById(String(link)) || null;
+			isAffiliate = dados.aliexpress_affiliate_productdetail_get_response.resp_result.result.current_record_count || false;
+			console.log(isAffiliate);
+			cupom = 'Sem cupom para esta oferta';
+		}
 
-		const video = produto.product[0].product_video_url
-		const titulo = produto.product[0].product_title
-		const price = produto.product[0].target_app_sale_price
-		const image = produto.product[0].product_main_image_url
-		let promotion = produto.product[0].promotion_link
-		const original_price = produto.product[0].target_original_price
-		console.log(video)
-		await bitly.short(promotion).then((result) => {
-			promotion = result.link
-		}).catch((err) => {
-			promotion = err.link
-		});
+		if (isAffiliate) {
+			const produto = await dados.aliexpress_affiliate_productdetail_get_response.resp_result.result.products;
+			const video = produto.product[0].product_video_url;
+			const titulo = produto.product[0].product_title;
+			const price = produto.product[0].target_app_sale_price;
+			const image = produto.product[0].product_main_image_url;
+			let promotion = produto.product[0].promotion_link;
+			const original_price = produto.product[0].target_original_price;
 
-		try {
-			console.log('Consultando API');
-			console.log(Boolean(video))
-			
+			console.log(video);
+
+			await bitly.short(promotion).then((result) => {
+				promotion = result.link;
+			}).catch((err) => {
+				promotion = err.link;
+			});
+
 			if (video) {
-				//console.log(video)
 				await ctx.telegram.sendVideo('@canaltestebo', video, {
 					caption: `
-	${titulo}
-	
-	CUPOM: <span class="tg-spoiler">${cupom ? cupom.replace(/cupom:/gi, '') : 'Sem cupom para esta oferta'}</span>
-	
-	👉🏼 <b>Preço</b>: R$ ${price} 🔥 <s>${original_price}</s>
-	`,
+						${titulo}
+						
+						CUPOM: <span class="tg-spoiler">${cupom ? cupom.replace(/cupom:/gi, '') : 'Sem cupom para esta oferta'}</span>
+						
+						👉🏼 <b>Preço</b>: R$ ${price} 🔥 <s>${original_price}</s>
+					`,
 					reply_markup: {
 						inline_keyboard: [[{ text: "✅ Comprar agora", url: promotion }]]
 					},
 					parse_mode: 'HTML'
-				})
-				return
+				});
+				return;
 			}
 
 			await ctx.telegram.sendPhoto('@canaltestebo', image, {
 				caption: `
-${titulo}
-
-CUPOM: <span class="tg-spoiler">${cupom ? cupom.replace(/cupom:/gi, '') : 'Sem cupom para esta oferta'}</span>
-
-👉🏼 <b>Preço</b>: R$ ${price} 🔥 <s>${original_price}</s>
-`,
+					${titulo}
+					
+					CUPOM: <span class="tg-spoiler">${cupom ? cupom.replace(/cupom:/gi, '') : 'Sem cupom para esta oferta'}</span>
+					
+					👉🏼 <b>Preço</b>: R$ ${price} 🔥 <s>${original_price}</s>
+				`,
 				reply_markup: {
 					inline_keyboard: [[{ text: "✅ Comprar agora", url: promotion }]]
 				},
 				parse_mode: 'HTML'
-			})
-
-		} catch (error) {
-			console.log('scrape error', error);
-			await ctx.telegram.sendPhoto('@canaltestebo', image, {
-				caption: `
-${titulo}
-
-CUPOM: <span class="tg-spoiler">${cupom ? cupom.replace(/cupom:/gi, '') : 'Sem cupom para esta oferta'}</span>
-	
-👉🏼 <b>Preço</b>: R$ ${price} 🔥 <s>${original_price}</s>
-`,
-				reply_markup: {
-					inline_keyboard: [[{ text: "✅ Comprar agora", url: promotion }]]
-				},
-				parse_mode: 'HTML'
-			})
-		} finally {
-			console.log('Fechando API');
+			});
+		} else {
+			console.log('O produto não tem comissão!');
+			ctx.reply('O produto não tem comissão!');
 		}
-	} else {
-		console.log('O produto não tem comissão!')
-		ctx.reply('O produto não tem comissão!')
+	} catch (error) {
+		console.log('Error:', error.message);
+		ctx.reply(`An error occurred: ${error.message}`);
 	}
-})
+});
 
 bot.hears(/teste (.+)/gi, async ctx => {
 	let browser, page;
 	const match = ctx.match[1].split(',');
-	const url = match[0]
-	const linkAffiliate = match[1]
+	const url = match[0];
+	const linkAffiliate = match[1];
 
 	try {
 		console.log('opening browser');
-		browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox',] });
+		browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
 		page = await browser.newPage();
 		await page.setDefaultNavigationTimeout(0);
 		page.setViewport({ width: 1024, height: 768, deviceScaleFactor: 1 });
@@ -410,32 +361,27 @@ bot.hears(/teste (.+)/gi, async ctx => {
 
 		await page.waitForSelector('meta[property="og:title"]', { visible: false });
 
-		// Scraper
-		const itens = ['og:title', 'og:image']
+		const itens = ['og:title', 'og:image'];
 		const getTitleAndImage = await page.evaluate((itens) => {
-			const dados = [{ 'og:title': null, 'og:image': null, 'video': null, 'prices': null }]
+			const dados = [{ 'og:title': null, 'og:image': null, 'video': null, 'prices': null }];
 			itens.forEach(selector => {
 				const item = document.querySelector(`meta[property='${selector}']`).getAttribute("content");
 				selector === 'og:title'
 					? dados[0]['og:title'] = item
-					: dados[0]['og:image'] = item
-			})
-			const video = document.querySelector(`video[id='item-video']`)?.getAttribute("src") || null
+					: dados[0]['og:image'] = item;
+			});
+			const video = document.querySelector(`video[id='item-video']`)?.getAttribute("src") || null;
 			const prices = document.querySelector(`meta[property="og:title"]`).getAttribute("content");
-			dados[0]['video'] = video
-			dados[0]['prices'] = prices.split('|')[0]
-			return dados
+			dados[0]['video'] = video;
+			dados[0]['prices'] = prices.split('|')[0];
+			return dados;
 		}, itens);
 
-		//Array.from(document.getElementsByClassName('dynamic-shipping-titleLayout')).forEach(item => { dados.push({ 'Frete': item.innerText }) 
-		//})
-		console.log(getTitleAndImage)
-		const video = getTitleAndImage[0].video
-		const titulo = getTitleAndImage[0]['og:title'].split('|')[1]
-		const image = getTitleAndImage[0]['og:image']
-		const priceCompleted = getTitleAndImage[0].prices.replace('R$', ' 🔥')
-
-		//👉🏼 <b>Preço</b>: R$ ${Number(priceFormatted).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+		console.log(getTitleAndImage);
+		const video = getTitleAndImage[0].video;
+		const titulo = getTitleAndImage[0]['og:title'].split('|')[1];
+		const image = getTitleAndImage[0]['og:image'];
+		const priceCompleted = getTitleAndImage[0].prices.replace('R$', ' 🔥');
 
 		if (video) {
 			await bot.telegram.sendVideo(process.env.CHAT_ID, video, {
@@ -448,7 +394,7 @@ bot.hears(/teste (.+)/gi, async ctx => {
 					inline_keyboard: [[{ text: "✅ Comprar agora", url: linkAffiliate }]]
 				},
 				parse_mode: 'HTML'
-			})
+			});
 		}
 
 		if (!video) {
@@ -462,7 +408,7 @@ bot.hears(/teste (.+)/gi, async ctx => {
 					inline_keyboard: [[{ text: "✅ Comprar agora", url: linkAffiliate }]]
 				},
 				parse_mode: 'HTML'
-			})
+			});
 		}
 
 	} catch (error) {
@@ -473,7 +419,7 @@ bot.hears(/teste (.+)/gi, async ctx => {
 			console.log('closing browser');
 		}
 	}
-})
+});
 
 // BOT HOTEL URBANO CLUBEHU
 async function getDados(url, ctx) {
@@ -481,11 +427,10 @@ async function getDados(url, ctx) {
 
 	try {
 		console.log('opening browser');
-		//browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox',] });
 		browser = await puppeteer.launch({
 			args: ['--no-sandbox', '--disable-setuid-sandbox'],
 			'ignoreHTTPSErrors': true
-		})
+		});
 		page = await browser.newPage();
 		await page.setDefaultNavigationTimeout(0);
 		page.setViewport({ width: 1260, height: 768, deviceScaleFactor: 1 });
@@ -493,74 +438,71 @@ async function getDados(url, ctx) {
 		await page.goto(url, { waitUntil: ['networkidle2'] });
 
 		const el = await page.waitForSelector('body > div:nth-child(6) > section > div.box-offer-top.box-nopadding.col-sm-6.col-md-6 > div');
-//		await delay(3000)
 
 		let titulo = await page.evaluate(element => {
 			return element.textContent;
-		}, (await page.$$('.package-title'))[0])
-		console.log(titulo)
+		}, (await page.$$('.package-title'))[0]);
+		console.log(titulo);
 
 		let descricao = await page.evaluate(element => {
 			return element.textContent;
-		}, (await page.$$('.description'))[0])
-		console.log(descricao)
+		}, (await page.$$('.description'))[0]);
+		console.log(descricao);
 
 		let diarias = await page.evaluate(element => {
 			return element.textContent;
-		}, (await page.$$('.daily-container'))[0])
-		console.log(diarias)
+		}, (await page.$$('.daily-container'))[0]);
+		console.log(diarias);
 
 		let ariaLive = await page.evaluate(element => {
 			return element.textContent;
-		}, (await page.$x('//*[@aria-live="polite"]'))[0])
-		console.log(ariaLive)
+		}, (await page.$x('//*[@aria-live="polite"]'))[0]);
+		console.log(ariaLive);
 
 		let periodo1 = await page.evaluate(element => {
 			return element.getAttribute('data-date');
-		}, (await page.$x('//*[@class="formated-date"]'))[0])
-		console.log(periodo1)
+		}, (await page.$x('//*[@class="formated-date"]'))[0]);
+		console.log(periodo1);
 
 		let periodo2 = await page.evaluate(element => {
 			return element.getAttribute('data-date');
-		}, (await page.$x('//*[@class="formated-date"]'))[2])
-		console.log(periodo2)
+		}, (await page.$x('//*[@class="formated-date"]'))[2]);
+		console.log(periodo2);
 
 		let aPartirDe = await page.evaluate(element => {
 			return element.getAttribute('data-promotion-price-original');
-		}, (await page.$x('//*[@class="promotion-price-original promotion-currency old-price"]'))[0])
-		console.log(aPartirDe)
+		}, (await page.$x('//*[@class="promotion-price-original promotion-currency old-price"]'))[0]);
+		console.log(aPartirDe);
 
 		let preco = await page.evaluate(element => {
 			return element.getAttribute('data-price');
-		}, (await page.$x('//*[@class="offer-top--price offer--price promotion-price"]'))[0])
-		console.log(preco)
+		}, (await page.$x('//*[@class="offer-top--price offer--price promotion-price"]'))[0]);
+		console.log(preco);
 
 		let image = await page.evaluate(element => {
 			return element.getAttribute('data-desktop-uri');
-		}, (await page.$x('//*[@class="photo-image retina-image"]'))[0])
+		}, (await page.$x('//*[@class="photo-image retina-image"]'))[0]);
 
-		console.log(ariaLive)
-		console.log(periodo1, periodo2)
-		console.log(aPartirDe, preco)
+		console.log(ariaLive);
+		console.log(periodo1, periodo2);
+		console.log(aPartirDe, preco);
 
-		titulo = titulo.trim()
-		descricao = descricao.trim()
+		titulo = titulo.trim();
+		descricao = descricao.trim();
 		diarias = diarias
 			.split(/\n/g)
 			.filter(el => el.trim())
-			.reduce((acc, item) => acc += `${item.trim()} `, '')
+			.reduce((acc, item) => acc += `${item.trim()} `, '');
 		ariaLive = ariaLive
 			.split(/\n/g)
 			.filter(el => el.trim())
-			.reduce((acc, item) => acc += `${item.trim()} + `, '')
-		ariaLive = ariaLive.substring(0, ariaLive.length - 2)
-		periodo1 = periodo1.trim().replace(/(\d*)-(\d*)-(\d*).*/, '$3-$2-$1')
-		periodo2 = periodo2.trim().replace(/(\d*)-(\d*)-(\d*).*/, '$3-$2-$1')
-		aPartirDe = aPartirDe.trim()
-		preco = preco.trim()
+			.reduce((acc, item) => acc += `${item.trim()} + `, '');
+		ariaLive = ariaLive.substring(0, ariaLive.length - 2);
+		periodo1 = periodo1.trim().replace(/(\d*)-(\d*)-(\d*).*/, '$3-$2-$1');
+		periodo2 = periodo2.trim().replace(/(\d*)-(\d*)-(\d*).*/, '$3-$2-$1');
+		aPartirDe = aPartirDe.trim();
+		preco = preco.trim();
 
-		// Scraper
-		//bot.telegram.sendMessage('@canaltestebo', diarias)
 		await bot.telegram.sendPhoto('@promotipviagens', `https:${image}`, {
 			caption: `
 	<b>${titulo}</b>
@@ -578,34 +520,18 @@ async function getDados(url, ctx) {
 				inline_keyboard: [[{ text: "✅ Comprar agora", url: url }]]
 			},
 			parse_mode: 'HTML'
-		})
-		await page.deleteCookie()
+		});
+		await page.deleteCookie();
 	} catch (error) {
 		console.log('scrape error', error);
-		ctx.reply('error.message')
+		ctx.reply(error.message);
 	} finally {
 		if (browser) {
 			await browser.close();
 			console.log('closing browser');
-			ctx.reply('Dados enviados para o grupo PromoTip Viagens')
+			ctx.reply('Dados enviados para o grupo PromoTip Viagens');
 		}
 	}
 }
 
-
-//scrapeAliExpress('https://pt.aliexpress.com/item/1005003557398937.html', 'https://s.click.aliexpress.com/e/_AWqj5b');
-
-// bot.hears(/enviar (.+)/gi, async ctx => {
-// 	(async () => {
-// 		try {
-// 			let match = ctx.match[1].split(',');
-// 			const urlProduto = match[0]
-// 			const urlAfiliado = match[1]
-// 			scrapeAliExpress(urlProduto, urlAfiliado);
-// 		} catch (e) {
-// 			ctx.reply(e);
-// 		}
-// 	})();
-// })
-
-bot.launch()
+bot.launch();
